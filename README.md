@@ -70,7 +70,7 @@ foreach ($stream as $event) {
 }
 ```
 
-One inbox's stream ends after that inbox's `inbox.deleted` or `inbox.expired`; `$client->inboxes->events->stream()` follows every inbox the key can read. The options `'reconnect' => false`, `'max_reconnects'` (default 5) and `'reconnect_delay'` (seconds, default 1; the server's `retry` overrides it) tune the reconnects; after the last one the loop throws an `APIConnectionError`, and an error a retry cannot fix (a revoked key) is thrown as its own class.
+One inbox's stream ends after that inbox's `inbox.deleted` or `inbox.expired`; `$client->inboxes->events->stream()` follows every inbox the key can read. The options `'reconnect' => false`, `'max_reconnects'` (reconnects that may fail in a row, default 5; one that opens the stream resets the count) and `'reconnect_delay'` (seconds, default 1; the server's `retry` overrides it) tune the reconnects; a reconnect the API refuses with a `Retry-After` waits that long (longer than 60 seconds: that error is thrown at once). After the last reconnect the loop throws its error: the API's answer as its own class (`RateLimitError`, `APIError`), or an `APIConnectionError` when the API could not be reached; an error a retry cannot fix (a revoked key) is thrown at once.
 
 ## Lists
 

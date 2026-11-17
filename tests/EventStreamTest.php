@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace BillionSend\Tests;
 
 use BillionSend\Exception\APIConnectionError;
+use BillionSend\Exception\APIError;
 use BillionSend\Exception\AuthenticationError;
 use BillionSend\Exception\BillionSendError;
+use BillionSend\Exception\RateLimitError;
 use BillionSend\InboxStreamEvent;
 use BillionSend\Request;
 use BillionSend\StreamGapEvent;
@@ -44,7 +46,7 @@ final class EventStreamTest extends TestCase
                 $got[] = $item instanceof StreamGapEvent ? "gap:{$item->reason}" : "{$item->id}:{$item->event}:{$item->payload()['thread_id']}:{$item->inboxId()}";
             }
             $this->fail('no error');
-        } catch (APIConnectionError) {
+        } catch (APIError) {
         }
         $this->assertSame(['1:inbox.email.received:t1:i1', '2:inbox.thread.created:t1:i1', 'gap:position expired', '3:email.received:t1:i1'], $got);
         $this->assertSame('0', $t->requests[0]->headers['last-event-id']);
@@ -93,6 +95,78 @@ final class EventStreamTest extends TestCase
         $this->expectException(BillionSendError::class);
         $this->expectExceptionMessage('Expected an event stream');
         $client->inboxes->events->stream();
+    }
+
+    public function testKeepsReconnectingAQuietStreamTheServerCloses(): void
+    {
+        [$client, $t] = $this->client(fn (int $n) => FakeTransport::stream($n <= 12 ? ": keepalive\n\n" : self::event('1', 'inbox.updated')), ['max_retries' => 0]);
+        $stream = $client->inboxes->events->stream([], ['max_reconnects' => 2]);
+        $got = [];
+        foreach ($stream as $item) {
+            $got[] = $item->id;
+            $stream->close();
+        }
+        $this->assertSame(['1'], $got);
+        $this->assertCount(13, $t->requests);
+    }
+
+    public function testGivesUpAfterTheReconnectsThatFailInARow(): void
+    {
+        [$client, $t] = $this->client(fn (int $n) => $n === 1 ? FakeTransport::stream(": keepalive\n\n") : FakeTransport::json(503, '{"name":"unavailable","message":"later"}'), ['max_retries' => 0]);
+        try {
+            self::collect($client->inboxes->events->stream([], ['max_reconnects' => 3]));
+            $this->fail('no error');
+        } catch (APIError $e) {
+            $this->assertSame('unavailable', $e->getErrorName());
+        }
+        $this->assertCount(4, $t->requests);
+    }
+
+    public function testWaitsOutARetryAfterAndThrowsTheAPIsAnswerWhenTheReconnectsRunOut(): void
+    {
+        [$client, $t] = $this->client(fn (int $n) => $n === 1
+            ? FakeTransport::stream(": keepalive\n\n")
+            : FakeTransport::json(429, '{"name":"too_many_streams","message":"later"}', ['retry-after' => '7']), ['max_retries' => 0]);
+        try {
+            self::collect($client->inboxes->events->stream([], ['max_reconnects' => 2]));
+            $this->fail('no error');
+        } catch (RateLimitError $e) {
+            $this->assertSame('too_many_streams', $e->getErrorName());
+        }
+        $this->assertCount(3, $t->requests);
+        // The first wait is the default second; the next is the API's 7.
+        $this->assertSame([1.0, 7.0], $this->waits);
+    }
+
+    public function testThrowsARetryAfterLongerThanAMinuteAtOnce(): void
+    {
+        [$client, $t] = $this->client(fn (int $n) => $n === 1
+            ? FakeTransport::stream(": keepalive\n\n")
+            : FakeTransport::json(503, '{"name":"unavailable","message":"later"}', ['retry-after' => '120']), ['max_retries' => 0]);
+        try {
+            self::collect($client->inboxes->events->stream([], ['max_reconnects' => 5]));
+            $this->fail('no error');
+        } catch (APIError $e) {
+            $this->assertSame(120.0, $e->getRetryAfter());
+        }
+        $this->assertCount(2, $t->requests);
+    }
+
+    public function testGivesUpWhenTheAPICannotBeReached(): void
+    {
+        [$client, $t] = $this->client(function (int $n) {
+            if ($n === 1) {
+                return FakeTransport::stream(": keepalive\n\n");
+            }
+            throw new APIConnectionError('Network error: refused');
+        }, ['max_retries' => 0]);
+        try {
+            self::collect($client->inboxes->events->stream([], ['max_reconnects' => 2]));
+            $this->fail('no error');
+        } catch (APIConnectionError $e) {
+            $this->assertStringContainsString('gave up after 2 reconnects', $e->getMessage());
+        }
+        $this->assertCount(3, $t->requests);
     }
 
     public function testWithoutReconnectEndsWhenTheConnectionDrops(): void

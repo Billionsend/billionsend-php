@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace BillionSend;
 
 use BillionSend\Exception\APIConnectionError;
+use BillionSend\Exception\APIError;
 use BillionSend\Exception\BillionSendError;
+use BillionSend\Exception\RateLimitError;
 
 /**
  * A live inbox event stream. Iterate it with foreach: it yields
@@ -13,9 +15,13 @@ use BillionSend\Exception\BillionSendError;
  * calling close(), closes the connection. When the connection drops (the
  * server also closes every stream about every ten minutes) it reconnects with
  * Last-Event-ID and the events in between are replayed first, unless
- * 'reconnect' => false was given. After 'max_reconnects' failures in a row
- * (default 5) it throws an APIConnectionError; an error a retry cannot fix (a
- * revoked key, say) is thrown as its own class.
+ * 'reconnect' => false was given. A reconnect the API refuses with a
+ * Retry-After (a 429, a 5xx) waits that long, and longer than 60 seconds
+ * throws that error at once. After 'max_reconnects' reconnects that fail in a
+ * row (default 5; one that opens the stream resets the count, so the server's
+ * scheduled closes never use it up) it throws the last one's error when the
+ * API answered, an APIConnectionError when it could not be reached; an error a
+ * retry cannot fix (a revoked key, say) is thrown as its own class.
  *
  * @implements \IteratorAggregate<int, InboxStreamEvent|StreamGapEvent>
  */
@@ -89,6 +95,8 @@ final class EventStream implements \IteratorAggregate
         $reconnect = ($this->options['reconnect'] ?? true) !== false;
         $maxReconnects = (int) ($this->options['max_reconnects'] ?? 5);
         $failures = 0;
+        // The last reconnect's failure, null when the stream itself dropped.
+        $lastError = null;
         // The position a gap was last handed out for: the server repeats the
         // gap on every reconnect from that position until a newer event moves it.
         $gapAt = null;
@@ -97,7 +105,6 @@ final class EventStream implements \IteratorAggregate
             while (!$this->closed) {
                 if (is_resource($this->handle)) {
                     foreach ($this->events($this->handle) as $event) {
-                        $failures = 0;
                         if ($event['event'] === self::GAP_EVENT) {
                             if ($gapGiven && $gapAt === $this->lastEventId) {
                                 continue;
@@ -119,21 +126,36 @@ final class EventStream implements \IteratorAggregate
                         }
                     }
                     $this->drop();
+                    $lastError = null;
                 }
                 if ($this->closed || !$reconnect) {
                     return;
                 }
                 $failures++;
                 if ($failures > $maxReconnects) {
+                    // The API's own answer says more than "gave up".
+                    if ($lastError !== null && $lastError->getStatusCode() !== null) {
+                        throw $lastError;
+                    }
                     throw new APIConnectionError("The event stream disconnected; gave up after $maxReconnects reconnects");
                 }
-                ($this->core->sleep)($this->delay);
+                $hinted = $lastError instanceof RateLimitError || $lastError instanceof APIError ? $lastError->getRetryAfter() : null;
+                ($this->core->sleep)($hinted ?? $this->delay);
                 try {
                     $this->handle = ($this->connect)($this->lastEventId)->stream;
+                    // Open again: only reconnects that fail in a row count,
+                    // not the server closing a quiet stream every ten minutes.
+                    $failures = 0;
+                    $lastError = null;
                 } catch (BillionSendError $error) {
                     if (!Core::retryable($error, false)) {
                         throw $error;
                     }
+                    $retryAfter = $error instanceof RateLimitError || $error instanceof APIError ? $error->getRetryAfter() : null;
+                    if ($retryAfter !== null && $retryAfter > Core::MAX_RETRY_AFTER) {
+                        throw $error;
+                    }
+                    $lastError = $error;
                 }
             }
         } finally {

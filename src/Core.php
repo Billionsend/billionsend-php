@@ -310,7 +310,7 @@ final class Core
             $status === 404 => new NotFoundError($message, $name, $status, $requestId),
             $status === 409 => new ConflictError($message, $name, $status, $requestId),
             $status === 429 => new RateLimitError($message, $name, $status, $requestId, self::parseRetryAfter($response->header('retry-after'))),
-            $status >= 500 => new APIError($message, $name, $status, $requestId),
+            $status >= 500 => new APIError($message, $name, $status, $requestId, self::parseRetryAfter($response->header('retry-after'))),
             default => new BillionSendError($message, $name, $status, $requestId),
         };
     }
