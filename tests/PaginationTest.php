@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace BillionSend\Tests;
 
+use BillionSend\Exception\BillionSendError;
 use BillionSend\Exception\PermissionDeniedError;
 use BillionSend\Request;
 
@@ -61,5 +62,49 @@ final class PaginationTest extends TestCase
         // Nothing is fetched until the walk starts.
         $client->inboxes->threads->searchAll('support@example.com', ['query' => 'x']);
         $this->assertCount(2, $t->requests);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function notListPages(): iterable
+    {
+        yield 'no data' => ['{"object":"list","has_more":true}'];
+        yield 'null data' => ['{"data":null,"has_more":true}'];
+        yield 'object data' => ['{"data":{"a":1},"has_more":true}'];
+        yield 'array answer' => ['[]'];
+    }
+
+    /**
+     * @dataProvider notListPages
+     */
+    public function testRefusesAnAnswerThatIsNotAListPage(string $answer): void
+    {
+        [$client, $t] = $this->client(fn () => FakeTransport::json(200, $answer));
+        try {
+            iterator_to_array($client->emails->listAll());
+            $this->fail('no error');
+        } catch (BillionSendError $e) {
+            $this->assertSame('application_error', $e->getErrorName());
+            $this->assertNull($e->getStatusCode());
+        }
+        $this->assertCount(1, $t->requests);
+    }
+
+    public function testRefusesAnItemToContinueFromWithoutAnId(): void
+    {
+        [$client, $t] = $this->client(fn () => FakeTransport::json(200, '{"object":"list","has_more":true,"data":[{"id":"a"},{"subject":"no id"}]}'));
+        $seen = [];
+        try {
+            foreach ($client->emails->listAll() as $email) {
+                $seen[] = $email['id'] ?? null;
+            }
+            $this->fail('no error');
+        } catch (BillionSendError $e) {
+            $this->assertSame('application_error', $e->getErrorName());
+            $this->assertStringContainsString('no id', $e->getMessage());
+        }
+        $this->assertSame(['a', null], $seen);
+        $this->assertCount(1, $t->requests);
     }
 }

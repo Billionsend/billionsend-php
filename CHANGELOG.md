@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 (2026-11-17)
+
+- The `...All()` generators throw a `BillionSendError` named `application_error` on an answer that is not a list page (no `data` array) or when the item to continue from has no `id`, instead of ending quietly: a truncated walk no longer passes for the whole list.
+
 ## 0.1.0 (2026-11-17)
 
 - First version of the BillionSend SDK for PHP: every operation of the BillionSend API (139), grouped into services and named after each operation's `operationId` (`emails.receiving.attachments.list` is `$client->emails->receiving->attachments->list()`). `emails.metrics`, which also has sub-operations, is `$client->emails->metrics->get()`. Request bodies and answers are associative arrays, the JSON the API document describes.
