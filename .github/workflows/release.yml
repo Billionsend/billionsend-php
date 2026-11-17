@@ -1,0 +1,40 @@
+name: release
+
+# Releases billionsend/billionsend-php at the version src/Version.php declares.
+# Packagist reads versions from the repository's tags (its GitHub hook updates
+# the package on every push), so the tag is the release. Run it by hand
+# (Actions → release → Run workflow) on a version tag: it checks the tag
+# against src/Version.php, runs the checks and creates the GitHub release.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the GitHub release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Only a tag that names src/Version.php's version releases, so the
+      # number on Packagist is always a commit you can find.
+      - name: Run from the tag of the declared version
+        run: |
+          test "$GITHUB_REF_TYPE" = tag
+          version=$(sed -n "s/.*public const VERSION = '\(.*\)';/\1/p" src/Version.php)
+          test "v$version" = "$GITHUB_REF_NAME"
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: "8.3"
+          extensions: curl, json
+          coverage: none
+      - run: composer validate --strict
+      - run: composer install --no-interaction --no-progress
+      - run: php bin/generate.php --check
+      - run: vendor/bin/phpunit
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md."
