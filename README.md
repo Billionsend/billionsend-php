@@ -147,11 +147,17 @@ The coverage test calls every operation of the snapshot through the SDK against 
 
 ## Releasing
 
-Packagist reads versions from this repository's tags; its GitHub hook updates the package on every push.
+Packagist reads versions from this repository's tags. It learns of a new tag from the repository's Packagist webhook (Settings → Webhooks: payload URL `https://packagist.org/api/github?username=<Packagist user>`, content type `application/json`, secret: that user's Packagist API token, push events), or from the update API when no webhook is set:
+
+```bash
+curl -X POST "https://packagist.org/api/update-package?username=<Packagist user>&apiToken=<API token>" \
+  -H "Content-Type: application/json" \
+  -d '{"repository":{"url":"https://github.com/billionsend/billionsend-php"}}'
+```
 
 1. Set `VERSION` in `src/Version.php`, add the version to `CHANGELOG.md`, and commit.
 2. Tag the commit `v<VERSION>` (for example `v0.1.0`) and push the tag.
-3. Run the `release` workflow (Actions → release → Run workflow) on that tag. It refuses a tag that does not name `src/Version.php`'s version, runs the checks and creates the GitHub release. Packagist has the version within a minute of the tag's push; `composer require billionsend/billionsend-php:^<VERSION>` installs it.
+3. Run the `release` workflow (Actions → release → Run workflow) on that tag. It refuses a tag that does not name `src/Version.php`'s version, runs the checks and creates the GitHub release. With the webhook, Packagist has the version within a minute of the tag's push (otherwise run the update call above); `composer require billionsend/billionsend-php:^<VERSION>` installs it.
 
 ## License
 

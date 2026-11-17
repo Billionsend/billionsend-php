@@ -1,8 +1,9 @@
 name: release
 
 # Releases billionsend/billionsend-php at the version src/Version.php declares.
-# Packagist reads versions from the repository's tags (its GitHub hook updates
-# the package on every push), so the tag is the release. Run it by hand
+# Packagist reads versions from the repository's tags (its webhook, or the
+# update call in the README's "Releasing", tells it of a new one), so the tag
+# is the release. Run it by hand
 # (Actions → release → Run workflow) on a version tag: it checks the tag
 # against src/Version.php, runs the checks and creates the GitHub release.
 on:
