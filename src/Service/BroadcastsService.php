@@ -38,6 +38,46 @@ final class BroadcastsService
     }
 
     /**
+     * List broadcast clicked links
+     *
+     * The links recipients clicked in a broadcast, most clicked first, from the statistics (the
+     * same counts as `GET /emails/metrics/links`). Newest first, with cursor pagination: `after`
+     * takes the last id of a page and pages toward older items, `before` takes the first id and
+     * pages back toward newer ones.
+     *
+     * GET /broadcasts/{id}/clicked-links (broadcasts.clickedLinks)
+     *
+     * @param string $id
+     * @param array{limit?: int, after?: string, before?: string} $params
+     * - limit: Page size, 1-100 (default 20)
+     * - after: Cursor: id of the last item of the current page; returns the next page. Must be an
+     * id this list returned; there is no sentinel value.
+     * - before: Cursor: id of the first item of the current page; returns the previous page; same
+     * rule as after.
+     * @param RequestOptions $options
+     * @return array<string, mixed>
+     */
+    public function clickedLinks(string $id, array $params = [], array $options = []): array
+    {
+        return $this->core->request(new Operation('broadcasts.clickedLinks', 'GET', '/broadcasts/{id}/clicked-links', ['id' => $id], false, false, []), $params, null, $options);
+    }
+
+    /**
+     * Walks every item of clickedLinks(), fetching pages as it goes: forward from
+     * $params['after'], or backward when $params['before'] is set. A failed page
+     * throws its BillionSendError.
+     *
+     * @param string $id
+     * @param array<string, mixed> $params
+     * @param RequestOptions $options
+     * @return \Generator<int, array<string, mixed>>
+     */
+    public function clickedLinksAll(string $id, array $params = [], array $options = []): \Generator
+    {
+        return Pagination::walk(fn (array $page): array => $this->clickedLinks($id, $page, $options), $params);
+    }
+
+    /**
      * Create a broadcast
      *
      * POST /broadcasts (broadcasts.create)
@@ -131,6 +171,53 @@ final class BroadcastsService
     public function listAll(array $params = [], array $options = []): \Generator
     {
         return Pagination::walk(fn (array $page): array => $this->list($page, $options), $params);
+    }
+
+    /**
+     * List broadcast recipients
+     *
+     * The recipients of a broadcast that had one outcome: `type` (required) is sent, delivered,
+     * opened, clicked, bounced, complained, unsubscribed or suppressed. `email` narrows to one
+     * address; `bounce_type` (permanent, transient or undetermined) narrows bounces. Read from the
+     * delivery records, newest recipient first. Newest first, with cursor pagination: `after` takes
+     * the last id of a page and pages toward older items, `before` takes the first id and pages
+     * back toward newer ones.
+     *
+     * GET /broadcasts/{id}/recipients (broadcasts.recipients)
+     *
+     * @param string $id
+     * @param array{limit?: int, after?: string, before?: string, type?: string, email?: string, bounce_type?: string} $params
+     * - limit: Page size, 1-100 (default 20)
+     * - after: Cursor: id of the last item of the current page; returns the next page. Must be an
+     * id this list returned; there is no sentinel value.
+     * - before: Cursor: id of the first item of the current page; returns the previous page; same
+     * rule as after.
+     * - type: The outcome to list recipients of; one `email_events` type One of: "sent",
+     * "delivered", "opened", "clicked", "bounced", "complained", "unsubscribed", "suppressed".
+     * - email: Only the recipient with this address (matched without regard to case)
+     * - bounce_type: Only bounces of this class; allowed only with type=bounced One of:
+     * "permanent", "transient", "undetermined".
+     * @param RequestOptions $options
+     * @return array<string, mixed>
+     */
+    public function recipients(string $id, array $params = [], array $options = []): array
+    {
+        return $this->core->request(new Operation('broadcasts.recipients', 'GET', '/broadcasts/{id}/recipients', ['id' => $id], false, false, []), $params, null, $options);
+    }
+
+    /**
+     * Walks every item of recipients(), fetching pages as it goes: forward from
+     * $params['after'], or backward when $params['before'] is set. A failed page
+     * throws its BillionSendError.
+     *
+     * @param string $id
+     * @param array<string, mixed> $params
+     * @param RequestOptions $options
+     * @return \Generator<int, array<string, mixed>>
+     */
+    public function recipientsAll(string $id, array $params = [], array $options = []): \Generator
+    {
+        return Pagination::walk(fn (array $page): array => $this->recipients($id, $page, $options), $params);
     }
 
     /**

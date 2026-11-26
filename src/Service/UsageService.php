@@ -26,6 +26,11 @@ final class UsageService
     /**
      * Get usage
      *
+     * What the team uses against what its plan allows: emails (the UTC day and the billing period),
+     * contacts, segments, broadcasts, domains and the API rate limit. BillionSend adds `plan`,
+     * `inboxes`, `webhook_endpoints`, `verification` and the period's overage fields. A limit
+     * nothing caps is null.
+     *
      * GET /usage (usage.get)
      *
      * @param RequestOptions $options

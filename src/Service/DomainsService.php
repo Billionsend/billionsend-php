@@ -19,8 +19,13 @@ use BillionSend\Pagination;
  */
 final class DomainsService
 {
+    public readonly DomainsClaimsService $claims;
+    public readonly DomainsUnsubscribePageService $unsubscribePage;
+
     public function __construct(private readonly Core $core)
     {
+        $this->claims = new DomainsClaimsService($core);
+        $this->unsubscribePage = new DomainsUnsubscribePageService($core);
     }
 
     /**

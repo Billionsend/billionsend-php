@@ -26,7 +26,9 @@ final class InboxesAgentService
     /**
      * Get agent settings
      *
-     * Hosted-agent settings. BillionSend runs no agent of its own, so an inbox never has one.
+     * The instructions, tone and allowed actions saved for this inbox's agent; empty until a first
+     * update. BillionSend stores these settings and runs no agent of its own: your own agent reads
+     * them (an inbox-scoped key can read its inbox's) and acts on the inbox through the API or MCP.
      *
      * GET /inboxes/{inbox_id}/agent (inboxes.agent.get)
      *
@@ -37,5 +39,26 @@ final class InboxesAgentService
     public function get(string $inboxId, array $options = []): array
     {
         return $this->core->request(new Operation('inboxes.agent.get', 'GET', '/inboxes/{inbox_id}/agent', ['inbox_id' => $inboxId], false, false, []), [], null, $options);
+    }
+
+    /**
+     * Update agent settings
+     *
+     * Saves the instructions, tone and allowed actions of this inbox's agent. Send at least one
+     * field; a field left out keeps its value, `null` clears instructions or tone, and `actions`
+     * replaces the list. BillionSend stores these settings and runs no agent of its own: your own
+     * agent reads them (an inbox-scoped key can read its inbox's) and acts on the inbox through the
+     * API or MCP. Needs a developer role; an inbox-scoped key cannot change them.
+     *
+     * PATCH /inboxes/{inbox_id}/agent (inboxes.agent.update)
+     *
+     * @param string $inboxId The inbox ID or its email address, such as support@example.com
+     * @param array<string, mixed> $body The request body.
+     * @param RequestOptions $options
+     * @return array<string, mixed>
+     */
+    public function update(string $inboxId, array $body, array $options = []): array
+    {
+        return $this->core->request(new Operation('inboxes.agent.update', 'PATCH', '/inboxes/{inbox_id}/agent', ['inbox_id' => $inboxId], false, false, []), [], $body, $options);
     }
 }

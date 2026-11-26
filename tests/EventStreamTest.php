@@ -169,6 +169,43 @@ final class EventStreamTest extends TestCase
         $this->assertCount(3, $t->requests);
     }
 
+    public function testResumesFromAnIdSentWithoutData(): void
+    {
+        [$client, $t] = $this->client(fn (int $n) => match ($n) {
+            1 => FakeTransport::stream("id: 40\n\n: keepalive\n\n"),
+            2 => FakeTransport::stream("id: 41\n\nid: 99\n"),
+            3 => FakeTransport::stream(self::event('42', 'inbox.updated') . "id: 43\n\nid: 4"),
+            default => FakeTransport::json(401, '{"name":"invalid_api_key","message":"revoked"}'),
+        });
+        $stream = $client->inboxes->events->stream();
+        $got = [];
+        try {
+            foreach ($stream as $item) {
+                $got[] = $item->id;
+            }
+            $this->fail('no error');
+        } catch (AuthenticationError) {
+        }
+        $this->assertSame(['42'], $got);
+        $this->assertArrayNotHasKey('last-event-id', $t->requests[0]->headers);
+        $this->assertSame('40', $t->requests[1]->headers['last-event-id']);
+        // The id of a block cut off midway never counts.
+        $this->assertSame('41', $t->requests[2]->headers['last-event-id']);
+        $this->assertSame('43', $t->requests[3]->headers['last-event-id']);
+    }
+
+    public function testRefusesAResumeIdHttpCannotCarry(): void
+    {
+        [$client, $t] = $this->client(fn () => FakeTransport::stream(''));
+        try {
+            $client->inboxes->events->stream([], ['last_event_id' => "1\nx: y"]);
+            $this->fail('it went out');
+        } catch (BillionSendError $e) {
+            $this->assertSame('invalid_header', $e->getErrorName());
+        }
+        $this->assertSame([], $t->requests);
+    }
+
     public function testWithoutReconnectEndsWhenTheConnectionDrops(): void
     {
         [$client, $t] = $this->client(fn () => FakeTransport::stream(self::event('1', 'inbox.updated')));

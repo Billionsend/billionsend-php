@@ -24,7 +24,7 @@ final class AudiencesContactsService
     }
 
     /**
-     * Create a contact
+     * Create a contact in an audience
      *
      * POST /audiences/{audienceId}/contacts (audiences.contacts.create)
      *
@@ -39,7 +39,7 @@ final class AudiencesContactsService
     }
 
     /**
-     * Delete a contact
+     * Delete a contact from an audience
      *
      * DELETE /audiences/{audienceId}/contacts/{id} (audiences.contacts.delete)
      *
@@ -58,7 +58,7 @@ final class AudiencesContactsService
     }
 
     /**
-     * Retrieve a contact
+     * Retrieve a contact in an audience
      *
      * GET /audiences/{audienceId}/contacts/{id} (audiences.contacts.get)
      *
@@ -73,7 +73,7 @@ final class AudiencesContactsService
     }
 
     /**
-     * Update a contact
+     * Update a contact in an audience
      *
      * PATCH /audiences/{audienceId}/contacts/{id} (audiences.contacts.update)
      *

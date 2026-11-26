@@ -146,6 +146,74 @@ final class ClientTest extends TestCase
         $this->assertCount(1, $t->requests);
     }
 
+    public function testRetriesA429ForEveryRequest(): void
+    {
+        [$client, $t] = $this->client(fn (int $n) => $n === 1
+            ? FakeTransport::json(429, '{"name":"rate_limit_exceeded","message":"slow"}')
+            : FakeTransport::json(200, '{"id":"d1"}'));
+        $this->assertSame(['id' => 'd1'], $client->domains->create(['name' => 'acme.dev']));
+        $this->assertCount(2, $t->requests);
+        $this->assertSame([0.5], $this->waits);
+    }
+
+    public function testRefusesAPathParameterAUrlWouldFoldAway(): void
+    {
+        [$client, $t] = $this->client(fn () => FakeTransport::json(200, '{}'));
+        foreach (['.', '..'] as $id) {
+            try {
+                $client->emails->get($id);
+                $this->fail('it went out');
+            } catch (BillionSendError $e) {
+                $this->assertStringContainsString('cannot be', $e->getMessage());
+            }
+        }
+        $this->assertSame([], $t->requests);
+    }
+
+    public function testTrimsTheKeyAndRefusesAControlCharacterInIt(): void
+    {
+        $transport = new FakeTransport(fn () => FakeTransport::json(200, '{}'));
+        (new Client(" bs_x\n", ['transport' => $transport]))->domains->list();
+        $this->assertSame('Bearer bs_x', $transport->requests[0]->headers['authorization']);
+        try {
+            (new Client(" \n", ['transport' => $transport]))->domains->list();
+            $this->fail('no error');
+        } catch (AuthenticationError $e) {
+            $this->assertSame('missing_api_key', $e->getErrorName());
+        }
+        $this->expectException(\InvalidArgumentException::class);
+        new Client("bs_x\r\nx-other: 1");
+    }
+
+    public function testRefusesAHeaderHttpCannotCarry(): void
+    {
+        [$client, $t] = $this->client(fn () => FakeTransport::json(200, '{}'));
+        foreach ([
+            ['idempotency_key' => 'welcome/订单-1'],
+            ['idempotency_key' => "a\nb"],
+            ['idempotency_key' => "a\n"],
+            ['headers' => ['x-note' => "a\r\nx-other: 1"]],
+            ['headers' => ["x-note\r\n" => 'a']],
+        ] as $options) {
+            try {
+                $client->emails->send(self::SEND, $options);
+                $this->fail('it went out');
+            } catch (BillionSendError $e) {
+                $this->assertSame('invalid_header', $e->getErrorName());
+                $this->assertStringNotContainsString('订单', $e->getMessage());
+            }
+        }
+        $this->assertSame([], $t->requests);
+        $this->assertSame([], $this->waits);
+    }
+
+    public function testLeavesAnEmptyListOutOfTheQuery(): void
+    {
+        [$client, $t] = $this->client(fn () => FakeTransport::json(200, '{}'));
+        $client->emails->metrics->get(['metrics' => [], 'timezone' => 'UTC']);
+        $this->assertSame('https://api.test/emails/metrics?timezone=UTC', $t->requests[0]->url);
+    }
+
     public function testASendCarriesOneKeyAcrossItsRetries(): void
     {
         [$client, $t] = $this->client(fn (int $n) => match ($n) {

@@ -138,10 +138,17 @@ foreach ($doc['paths'] as $path => $item) {
         }
         $body = null;
         $bodyRequired = false;
+        $fileFields = null;
         if (isset($o['requestBody'])) {
             $bodyRequired = (bool) ($o['requestBody']['required'] ?? false);
-            foreach ($o['requestBody']['content'] as $c) {
+            foreach ($o['requestBody']['content'] as $ct => $c) {
                 $body = schemaOf($doc, $c['schema'] ?? null);
+                if ($ct === 'multipart/form-data') {
+                    $fileFields = array_keys(array_filter($body['properties'] ?? [], fn ($p) => ($p['format'] ?? '') === 'binary'));
+                } elseif ($ct !== 'application/json') {
+                    fwrite(STDERR, "$id: unknown request content type $ct\n");
+                    exit(1);
+                }
             }
         }
         $paginated = false;
@@ -166,6 +173,7 @@ foreach ($doc['paths'] as $path => $item) {
             'stream' => $stream,
             'body' => $body,
             'bodyRequired' => $bodyRequired,
+            'fileFields' => $fileFields,
             'paginated' => $paginated,
         ];
     }
@@ -251,6 +259,17 @@ function method(array $op): string
         $shape = $isList ? 'list<array<string, mixed>>' : 'array<string, mixed>';
         $desc = trim(preg_replace('/\s+/', ' ', $op['body']['description'] ?? '') ?? '');
         $desc = $desc === '' ? 'The request body.' : $desc;
+        if ($op['fileFields'] !== null) {
+            $fields = [];
+            foreach ($op['body']['properties'] as $key => $p) {
+                $isFile = in_array($key, $op['fileFields'], true);
+                $optional = $isFile || in_array($key, $op['body']['required'] ?? [], true) ? '' : '?';
+                $json = str_starts_with($p['description'] ?? '', 'JSON-encoded');
+                $fields[] = "$key$optional: " . ($isFile ? '\\BillionSend\\FileUpload|resource|string' : ($json ? 'array<mixed>|string' : 'string'));
+            }
+            $shape = 'array{' . implode(', ', $fields) . '}';
+            $desc = 'Sent as multipart/form-data; an array field is encoded as JSON. A file is its content as a string, an open stream or a FileUpload. The upload is repeated only after a 429.';
+        }
         if ($op['bodyRequired']) {
             $args[] = 'array $body';
             $doc .= "     * @param $shape \$body $desc\n";
@@ -277,7 +296,7 @@ function method(array $op): string
     $doc .= "     * @param RequestOptions \$options\n";
     $headerNames = array_map(fn ($p) => var_export($p['name'], true), $op['headers']);
     $spec = sprintf(
-        "new Operation(%s, %s, %s, [%s], %s, %s, [%s]%s)",
+        "new Operation(%s, %s, %s, [%s], %s, %s, [%s]%s%s)",
         var_export($op['id'], true),
         var_export($op['method'], true),
         var_export($op['path'], true),
@@ -286,6 +305,7 @@ function method(array $op): string
         $op['noAuth'] ? 'true' : 'false',
         implode(', ', $headerNames),
         ($op['body']['type'] ?? null) === 'array' ? ', listBody: true' : '',
+        $op['fileFields'] === null ? '' : ', fileFields: [' . implode(', ', array_map(fn ($f) => var_export($f, true), $op['fileFields'])) . ']',
     );
     $params = $hasParams ? '$params' : '[]';
     $name = $op['name'];
@@ -376,7 +396,9 @@ foreach ($ops as $op) {
     foreach ($op['pathParams'] as $i => $p) {
         $args[] = var_export('p' . ($i + 1), true);
     }
-    if ($op['body'] !== null) {
+    if ($op['fileFields'] !== null) {
+        $args[] = '[' . implode(', ', array_map(fn ($f) => var_export($f, true) . " => 'x'", $op['fileFields'])) . ']';
+    } elseif ($op['body'] !== null) {
         $args[] = '[]';
     }
     $chain = '$c->' . implode('->', array_merge($op['service'], [$op['name']]));

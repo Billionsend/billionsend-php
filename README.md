@@ -2,7 +2,7 @@
 
 The official PHP client for the [BillionSend](https://billionsend.com) email API: send email, run inboxes for people and agents, stream inbox events, verify webhooks, and manage domains, contacts and broadcasts.
 
-- Every API operation (139), generated from the BillionSend OpenAPI document.
+- Every API operation (186), generated from the BillionSend OpenAPI document.
 - Errors as classes, all `BillionSendError`s with the status, the API's error name and the request id.
 - Safe sends: every send carries an `Idempotency-Key`, so retries after a timeout never send twice.
 - Generators for every list, and live inbox events with automatic resume.
@@ -11,6 +11,8 @@ The official PHP client for the [BillionSend](https://billionsend.com) email API
 Documentation: [billionsend.com/docs](https://billionsend.com/docs) · Source: [github.com/billionsend/billionsend-php](https://github.com/billionsend/billionsend-php)
 
 ## Install
+
+Needs PHP 8.1 or later with the `curl` and `json` extensions, and nothing else.
 
 ```bash
 composer require billionsend/billionsend-php
@@ -41,13 +43,35 @@ echo $sent['id'];
 
 Every operation is a method, named after its `operationId`: the dotted path is the chain of services. `emails.send` is `$client->emails->send()`, `emails.receiving.attachments.list` is `$client->emails->receiving->attachments->list()`, `inboxes.threads.labels.set` is `$client->inboxes->threads->labels->set()`. The one operation that also has sub-operations, `emails.metrics`, is `$client->emails->metrics->get()` beside `->links()`, `->countries()` and `->clients()`.
 
-A method takes the path parameters in order, then the request body, then the query and header parameters (`$params`), then the call's options. Bodies and answers are associative arrays: the JSON the [API reference](https://billionsend.com/docs) describes, field for field. List parameters can be PHP lists; they go comma-separated in one key.
+A method takes the path parameters in order, then the request body, then the query and header parameters (`$params`), then the call's options; each is there only when the operation has it. Bodies and answers are associative arrays: the JSON the [API reference](https://billionsend.com/docs) describes, field for field. List parameters can be PHP lists; they go comma-separated in one key. The client checks no body or parameter against a schema, so a field or parameter newer than this release can be passed as it is, and an answer shows every field the API sends. The two operations that take an `x-batch-validation` header (`emails->batch` and `contacts->batch->create`) read it from `$params`: `$client->emails->batch($emails, ['x-batch-validation' => 'permissive'])`.
 
 ```php
 $page = $client->emails->list(['limit' => 50]);
 foreach ($page['data'] as $email) {
     echo $email['id'], ' ', $email['subject'], "\n";
 }
+```
+
+## Custom events and uploads
+
+`events->send` records an event for a contact and starts the automations that wait for it; like a send, it always carries an `Idempotency-Key`:
+
+```php
+$client->events->send(['event' => 'user.signed_up', 'email' => 'ana@example.com', 'payload' => ['plan' => 'pro']]);
+```
+
+`contacts->imports->create` and the two logo uploads (`brand->logo->upload`, `domains->unsubscribePage->logo->upload`) send `multipart/form-data`. A file is its content as a string, an open stream, or a `BillionSend\FileUpload` (`new FileUpload($content, $filename, $contentType)`, `FileUpload::fromPath($path)`). Array fields such as `column_map` are encoded as JSON for you:
+
+```php
+use BillionSend\FileUpload;
+
+$import = $client->contacts->imports->create([
+    'file' => FileUpload::fromPath('contacts.csv'),
+    'column_map' => ['email' => 'Email', 'first_name' => 'First Name'],
+]);
+$status = $client->contacts->imports->get($import['id'])['status'];
+
+$client->brand->logo->upload(['file' => FileUpload::fromPath('logo.png')]); // PNG, JPEG or WebP, at most 2 MiB
 ```
 
 ## Receive mail in an agent loop
@@ -63,6 +87,9 @@ foreach ($stream as $event) {
     if ($event instanceof StreamGapEvent) {
         continue; // events may be missing: read the threads list again
     }
+    if ($event->event !== 'inbox.email.received') {
+        continue; // inbox.deleted and inbox.expired arrive whatever 'types' asks for
+    }
     $data = $event->payload(); // thread_id, email_id, ...
     $client->inboxes->threads->emails->reply($event->inboxId(), $data['thread_id'], $data['email_id'], [
         'text' => 'Thanks, we are on it.',
@@ -70,7 +97,7 @@ foreach ($stream as $event) {
 }
 ```
 
-One inbox's stream ends after that inbox's `inbox.deleted` or `inbox.expired`; `$client->inboxes->events->stream()` follows every inbox the key can read. The options `'reconnect' => false`, `'max_reconnects'` (reconnects that may fail in a row, default 5; one that opens the stream resets the count) and `'reconnect_delay'` (seconds, default 1; the server's `retry` overrides it) tune the reconnects; a reconnect the API refuses with a `Retry-After` waits that long (longer than 60 seconds: that error is thrown at once). After the last reconnect the loop throws its error: the API's answer as its own class (`RateLimitError`, `APIError`), or an `APIConnectionError` when the API could not be reached; an error a retry cannot fix (a revoked key) is thrown at once.
+One inbox's stream ends after that inbox's `inbox.deleted` or `inbox.expired`; `$client->inboxes->events->stream()` follows every inbox the key can read. The options `'reconnect' => false`, `'max_reconnects'` (reconnects that may fail in a row, default 5; one that opens the stream resets the count) and `'reconnect_delay'` (seconds, default 1; the server's `retry` overrides it) tune the reconnects; a connection silent for a minute (the server sends a keep-alive every 15 seconds) counts as dropped; a reconnect the API refuses with a `Retry-After` waits that long (longer than 60 seconds: that error is thrown at once). After the last reconnect the loop throws its error: the API's answer as its own class (`RateLimitError`, `APIError`), or an `APIConnectionError` when the API could not be reached; an error a retry cannot fix (a revoked key) is thrown at once.
 
 ## Lists
 
@@ -84,7 +111,7 @@ foreach ($client->emails->listAll(['limit' => 100]) as $email) {
 
 ## Errors
 
-A failed call throws one of `ValidationError` (400, 422), `AuthenticationError` (401, or no key configured), `PermissionDeniedError` (403), `NotFoundError` (404), `ConflictError` (409), `RateLimitError` (429, with `getRetryAfter()` in seconds), `APIError` (5xx), `APIConnectionError` (no answer) or `APITimeoutError` (the attempt timed out), all in `BillionSend\Exception` and all `BillionSendError`s:
+A failed call throws one of `ValidationError` (400, 422), `AuthenticationError` (401, or no key configured), `PermissionDeniedError` (403), `NotFoundError` (404), `ConflictError` (409), `RateLimitError` (429, with `getRetryAfter()` in seconds), `APIError` (5xx, also with `getRetryAfter()`), `APIConnectionError` (no answer) or `APITimeoutError` (the attempt timed out), all in `BillionSend\Exception` and all `BillionSendError`s. Any other status (such as 402 or 413) is a plain `BillionSendError`, as are the SDK's own failures such as an answer that is not JSON or a list page that is not a list (`application_error`):
 
 ```php
 use BillionSend\Exception\BillionSendError;
@@ -99,11 +126,13 @@ try {
 }
 ```
 
+Some mistakes are caught before anything is sent: an empty, `.` or `..` path parameter (`BillionSendError`), a header value with a non-ASCII or control character, such as an idempotency key (`BillionSendError` named `invalid_header`), and a control character in the API key or an upload field of the wrong type (`InvalidArgumentException`).
+
 `getErrorName()` is the API's error name (such as `validation_error`); `getRequestId()` is the answer's `x-request-id`, the request on the dashboard's Logs page.
 
 ## Retries and idempotency
 
-Requests safe to repeat are retried on 429, 5xx, timeouts and network failures (`'max_retries'`, default 2): `GET`, `PUT` and `DELETE`, and the eight sending operations, which always carry an `Idempotency-Key`. A sending operation's retries reuse one key, so a retry after a timeout never sends twice; a `409 concurrent_idempotent_requests` (the first attempt still in progress) is retried too. The wait is the server's `Retry-After` when it sends one (longer than 60 seconds: the error is thrown instead), otherwise an exponential backoff with jitter from 0.5 s, at most 8 seconds. Each attempt is bounded by `'timeout'` (seconds, default 60).
+A 429 is retried for every request (the API answers it before it writes anything). 5xx, timeouts and network failures are retried only for requests safe to repeat: `GET`, `PUT` and `DELETE`, the eight sending operations and `events->send`, which always carry an `Idempotency-Key`, and any request you give a key. An upload without a key is not repeated after them, whatever its method. `'max_retries'` (default 2) bounds the retries of one call. A sending operation's retries reuse one key, so a retry after a timeout never sends twice; a `409 concurrent_idempotent_requests` (the first attempt still in progress) is retried too. The wait is the server's `Retry-After` when it sends one (longer than 60 seconds: the error is thrown instead), otherwise an exponential backoff with jitter from 0.5 s, at most 8 seconds. Each attempt is bounded by `'timeout'` (seconds, default 60).
 
 Pass your own key to make a send safe across calls and processes too:
 
@@ -131,6 +160,8 @@ if ($event['type'] === 'inbox.email.received') {
     // ...
 }
 ```
+
+The `whsec_` secret is returned when you create the endpoint, and again by `$client->webhooks->get($id)`. Rotate it with `$client->webhooks->rotateSigningSecret($id, ['overlap_hours' => 24])`: while two secrets are live, a delivery carries a signature for each and either verifies it.
 
 ## Development
 

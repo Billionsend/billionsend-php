@@ -19,8 +19,11 @@ use BillionSend\Pagination;
  */
 final class WebhooksService
 {
+    public readonly WebhooksEventsService $events;
+
     public function __construct(private readonly Core $core)
     {
+        $this->events = new WebhooksEventsService($core);
     }
 
     /**
@@ -110,16 +113,16 @@ final class WebhooksService
      * switch at any point without a gap. A second rotation inside the window replaces the previous
      * secret.
      *
-     * POST /webhooks/{id}/rotate (webhooks.rotate)
+     * POST /webhooks/{id}/signing-secret/rotate (webhooks.rotateSigningSecret)
      *
      * @param string $id
      * @param array<string, mixed>|null $body The request body.
      * @param RequestOptions $options
      * @return array<string, mixed>
      */
-    public function rotate(string $id, ?array $body = null, array $options = []): array
+    public function rotateSigningSecret(string $id, ?array $body = null, array $options = []): array
     {
-        return $this->core->request(new Operation('webhooks.rotate', 'POST', '/webhooks/{id}/rotate', ['id' => $id], false, false, []), [], $body, $options);
+        return $this->core->request(new Operation('webhooks.rotateSigningSecret', 'POST', '/webhooks/{id}/signing-secret/rotate', ['id' => $id], false, false, []), [], $body, $options);
     }
 
     /**

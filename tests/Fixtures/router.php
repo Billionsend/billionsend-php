@@ -15,6 +15,15 @@ switch ($path) {
             'body' => $body,
         ]);
         break;
+    case '/upload':
+        header('Content-Type: application/json');
+        echo json_encode([
+            'fields' => $_POST,
+            'name' => $_FILES['file']['name'] ?? null,
+            'type' => $_FILES['file']['type'] ?? null,
+            'content' => isset($_FILES['file']) ? base64_encode((string) file_get_contents($_FILES['file']['tmp_name'])) : null,
+        ]);
+        break;
     case '/slow':
         usleep(1_500_000);
         echo '{}';

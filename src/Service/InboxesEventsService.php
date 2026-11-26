@@ -56,8 +56,8 @@ final class InboxesEventsService
      * Stream one inbox's events
      *
      * BillionSend extension: the event stream of one inbox, as GET /inboxes/events, ending when the
-     * inbox is deleted or expires. An inbox-scoped key may stream its own inbox, without the events
-     * about held mail.
+     * inbox is deleted or expires; it carries inbox.deleted and inbox.expired whatever types names.
+     * An inbox-scoped key may stream its own inbox, without the events about held mail.
      *
      * GET /inboxes/{inbox_id}/events (inboxes.events.streamInbox)
      *

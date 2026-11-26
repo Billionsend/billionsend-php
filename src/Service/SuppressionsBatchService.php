@@ -24,7 +24,7 @@ final class SuppressionsBatchService
     }
 
     /**
-     * Add in bulk
+     * Add suppressions in bulk
      *
      * POST /suppressions/batch/add (suppressions.batch.add)
      *
@@ -38,7 +38,7 @@ final class SuppressionsBatchService
     }
 
     /**
-     * Remove in bulk
+     * Remove suppressions in bulk
      *
      * POST /suppressions/batch/remove (suppressions.batch.remove)
      *

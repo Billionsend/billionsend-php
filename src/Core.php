@@ -79,8 +79,8 @@ final class Core
      */
     public function request(Operation $op, array $params, ?array $body, array $options): array
     {
-        [$request, $keyed, $retryable, $maxRetries] = $this->prepare($op, $params, $body, $options, false);
-        $response = $this->send($request, $keyed, $retryable, $maxRetries, false);
+        [$request, $keyed, $repeatable, $maxRetries] = $this->prepare($op, $params, $body, $options, false);
+        $response = $this->send($request, $keyed, $repeatable, $maxRetries, false);
         if (array_key_exists('response_headers', $options)) {
             // A reference the caller put in: ['response_headers' => &$headers].
             $options['response_headers'] = $response->headers;
@@ -115,6 +115,7 @@ final class Core
             $headers = $request->headers;
             if ($lastEventId !== null && $lastEventId !== '') {
                 $headers['last-event-id'] = $lastEventId;
+                self::checkHeaders($headers);
             }
             $attempt = new Request($request->method, $request->url, $headers, null, $request->timeout);
             return $this->send($attempt, false, true, $maxRetries, true);
@@ -141,12 +142,17 @@ final class Core
             if ($value === '') {
                 throw new BillionSendError("Missing path parameter \"$name\"");
             }
+            // A URL folds these away: the request would go to another route.
+            if ($value === '.' || $value === '..') {
+                throw new BillionSendError("The path parameter \"$name\" cannot be \"$value\"");
+            }
             $path = str_replace('{' . $name . '}', rawurlencode($value), $path);
         }
         $query = [];
         $paramHeaders = [];
         foreach ($params as $name => $value) {
-            if ($value === null) {
+            // An empty list is "no filter": the API refuses an empty value.
+            if ($value === null || $value === []) {
                 continue;
             }
             $text = self::paramText($value);
@@ -167,7 +173,9 @@ final class Core
             }
         }
         $encoded = null;
-        if ($body !== null) {
+        if ($body !== null && $op->fileFields !== null) {
+            [$encoded, $headers['content-type']] = Multipart::encode($body, $op->fileFields);
+        } elseif ($body !== null) {
             // An empty PHP array is an empty JSON object unless the body is a list.
             $value = $body === [] && !$op->listBody ? new \stdClass() : $body;
             $encoded = json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -183,18 +191,22 @@ final class Core
         } else {
             $headers['authorization'] = 'Bearer ' . $this->apiKey;
         }
+        self::checkHeaders($headers);
         $keyed = isset($headers['idempotency-key']);
-        $retryable = in_array($op->method, self::SAFE_METHODS, true) || $keyed;
+        // An upload is not repeated after a lost answer, whatever its method.
+        $repeatable = $keyed || ($op->fileFields === null && in_array($op->method, self::SAFE_METHODS, true));
         $maxRetries = (int) ($options['max_retries'] ?? $this->maxRetries);
         $timeout = (float) ($options['timeout'] ?? $this->timeout);
-        return [new Request($op->method, $url, $headers, $encoded, $timeout), $keyed, $retryable, $maxRetries];
+        return [new Request($op->method, $url, $headers, $encoded, $timeout), $keyed, $repeatable, $maxRetries];
     }
 
     /**
      * Runs the attempts of one request: the answer of the first that succeeds,
-     * or the error of the last.
+     * or the error of the last. A 429 is retried for every request (the API
+     * answers it before it writes anything); the other retryable failures only
+     * when the request is safe to repeat.
      */
-    public function send(Request $request, bool $keyed, bool $retryable, int $maxRetries, bool $stream): Response
+    public function send(Request $request, bool $keyed, bool $repeatable, int $maxRetries, bool $stream): Response
     {
         for ($attempt = 0; ; $attempt++) {
             $retryAfter = null;
@@ -217,7 +229,7 @@ final class Core
                 $retryAfter = $response->header('retry-after');
                 throw self::errorFromResponse($response);
             } catch (BillionSendError $error) {
-                if (!$retryable || $attempt >= $maxRetries || !self::retryable($error, $keyed)) {
+                if ($attempt >= $maxRetries || !self::retryable($error, $keyed) || (!$repeatable && $error->getStatusCode() !== 429)) {
                     throw $error;
                 }
                 $delay = $this->retryDelay($attempt, $retryAfter);
@@ -323,6 +335,23 @@ final class Core
         $b[8] = chr((ord($b[8]) & 0x3f) | 0x80);
         $h = bin2hex($b);
         return sprintf('%s-%s-%s-%s-%s', substr($h, 0, 8), substr($h, 8, 4), substr($h, 12, 4), substr($h, 16, 4), substr($h, 20));
+    }
+
+    /**
+     * Refuses, before anything is sent, a header HTTP cannot carry: a non-ASCII
+     * or control character (a line break would end the header line). The error
+     * names the header, never its value (it may be a key).
+     *
+     * @param array<array-key, string> $headers
+     */
+    private static function checkHeaders(array $headers): void
+    {
+        foreach ($headers as $name => $value) {
+            if (!preg_match('/^[\x21-\x7E]+$/D', (string) $name) || !preg_match('/^[\x09\x20-\x7E]*$/D', $value)) {
+                $shown = preg_replace('/[^\x21-\x7E]/', '?', (string) $name);
+                throw new BillionSendError("The \"$shown\" header must be ASCII text without control characters", 'invalid_header');
+            }
+        }
     }
 
     /** A query or header value: lists comma-separated in one key, booleans as true / false. */

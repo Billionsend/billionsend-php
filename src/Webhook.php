@@ -58,7 +58,7 @@ final class Webhook
         }
         $expected = hash_hmac('sha256', "$id.$timestamp.$payload", self::key($secret), true);
         $matched = false;
-        foreach (explode(' ', $signature) as $candidate) {
+        foreach (preg_split('/\s+/', $signature) ?: [] as $candidate) {
             $parts = explode(',', $candidate, 2);
             if (count($parts) !== 2 || $parts[0] !== 'v1') {
                 continue;
@@ -91,7 +91,7 @@ final class Webhook
             if (strtolower((string) $key) !== $name) {
                 continue;
             }
-            return is_array($value) ? (isset($value[0]) ? (string) $value[0] : null) : (string) $value;
+            return is_array($value) ? (isset($value[0]) ? trim((string) $value[0]) : null) : trim((string) $value);
         }
         return null;
     }
@@ -99,6 +99,8 @@ final class Webhook
     /** The key of a whsec_ secret: canonical base64 of 24 to 64 bytes, as the dashboard and the API hand it out. */
     private static function key(string $secret): string
     {
+        // A secret read from a file ends in a newline.
+        $secret = trim($secret);
         if (str_starts_with($secret, self::SECRET_PREFIX)) {
             $encoded = substr($secret, strlen(self::SECRET_PREFIX));
             $key = base64_decode($encoded, true);

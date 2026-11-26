@@ -8,6 +8,7 @@ use BillionSend\Client;
 use BillionSend\CurlTransport;
 use BillionSend\Exception\APITimeoutError;
 use BillionSend\Exception\NotFoundError;
+use BillionSend\FileUpload;
 use BillionSend\InboxStreamEvent;
 use BillionSend\Operation;
 use BillionSend\Request;
@@ -55,6 +56,22 @@ final class CurlTransportTest extends TestCase
         $this->assertSame(200, $answer->status);
         $this->assertSame('req_echo', $answer->header('x-request-id'));
         $this->assertSame(['method' => 'POST', 'query' => 'a=1', 'authorization' => 'Bearer bs_x', 'idempotency_key' => 'k1', 'body' => '{"x":1}'], json_decode($answer->body, true));
+    }
+
+    public function testSendsAnUploadAServerReads(): void
+    {
+        $client = new Client('bs_x', ['base_url' => self::$base, 'max_retries' => 0]);
+        // Binary, and past the size at which cURL asks before sending.
+        $content = random_bytes(200_000);
+        $got = $client->core()->request(
+            new Operation('x', 'POST', '/upload', fileFields: ['file']),
+            [],
+            ['file' => new FileUpload($content, 'people.csv'), 'column_map' => ['email' => 'Email']],
+            [],
+        );
+        $this->assertSame(['column_map' => '{"email":"Email"}'], $got['fields']);
+        $this->assertSame(['people.csv', 'text/csv'], [$got['name'], $got['type']]);
+        $this->assertSame($content, base64_decode($got['content']));
     }
 
     public function testMapsAnErrorAnswerAndTimesOut(): void

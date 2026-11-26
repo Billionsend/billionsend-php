@@ -76,7 +76,7 @@ final class SuppressionsService
      *
      * GET /suppressions (suppressions.list)
      *
-     * @param array{limit?: int, after?: string, before?: string, origin?: string} $params
+     * @param array{limit?: int, after?: string, before?: string, origin?: string, kind?: string} $params
      * - limit: Page size, 1-100 (default 20)
      * - after: Cursor: id of the last item of the current page; returns the next page. Must be an
      * id this list returned; there is no sentinel value.
@@ -84,6 +84,8 @@ final class SuppressionsService
      * rule as after.
      * - origin: Only suppressions of this origin: bounce, complaint or manual One of: "bounce",
      * "complaint", "manual".
+     * - kind: BillionSend extension. email (default): entries for single addresses; domain: entries
+     * for a whole domain; all: both One of: "email", "domain", "all".
      * @param RequestOptions $options
      * @return array<string, mixed>
      */

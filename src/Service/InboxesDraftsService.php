@@ -141,7 +141,7 @@ final class InboxesDraftsService
      * Send a draft
      *
      * Sends the draft from the inbox address; the body is optional and only ever holds `headers`,
-     * which are not supported yet (an empty value is fine), and an `Idempotency-Key` is accepted.
+     * which are not supported (an empty value is fine), and an `Idempotency-Key` is accepted.
      * Answers the sent email's id. A draft waiting for approval goes out only when a person or a
      * team-wide full access key sends it (403 approval_required otherwise), and their send skips
      * the inbox's rules but never the team's limits or the shared domain's rules. An agent's send

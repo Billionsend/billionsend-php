@@ -14,7 +14,7 @@ use BillionSend\Exception\APITimeoutError;
 final class CurlTransport implements Transport
 {
     /** How long an open event stream may stay silent before it counts as dropped (the server sends keep-alive comments well within it). */
-    public const STREAM_IDLE_TIMEOUT = 120.0;
+    public const STREAM_IDLE_TIMEOUT = 60.0;
 
     public function send(Request $request, bool $stream = false): Response
     {
@@ -55,7 +55,6 @@ final class CurlTransport implements Transport
         $errno = curl_errno($ch);
         $error = curl_error($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        curl_close($ch);
         if ($errno === CURLE_OPERATION_TIMEDOUT) {
             throw new APITimeoutError(sprintf('Request timed out after %.0f ms', $request->timeout * 1000));
         }

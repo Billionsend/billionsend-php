@@ -26,6 +26,9 @@ final class EmailsMetricsService
     /**
      * Get email metrics
      *
+     * Delivery statistics for a date range, by period, domain, email or broadcast: counts and rates
+     * for sent, delivered, bounced, complained, opened and clicked. Needs a full access key.
+     *
      * GET /emails/metrics (emails.metrics)
      *
      * @param array{start_date?: string, end_date?: string, timezone?: string, granularity?: string, metrics?: list<string>|string, dimensions?: list<string>|string, domain_id?: list<string>|string, email_id?: list<string>|string, broadcast_id?: list<string>|string} $params
@@ -49,6 +52,8 @@ final class EmailsMetricsService
     /**
      * Get opens by mail client
      *
+     * Opens in a date range by the mail client that fetched the images. Needs a full access key.
+     *
      * GET /emails/metrics/clients (emails.metrics.clients)
      *
      * @param array{start_date?: string, end_date?: string, domain_id?: list<string>|string, broadcast_id?: list<string>|string} $params
@@ -67,6 +72,9 @@ final class EmailsMetricsService
     /**
      * Get opens and clicks by country
      *
+     * Opens and clicks in a date range by the reader's country, with people and machines counted
+     * apart. Needs a full access key.
+     *
      * GET /emails/metrics/countries (emails.metrics.countries)
      *
      * @param array{start_date?: string, end_date?: string, domain_id?: list<string>|string, broadcast_id?: list<string>|string} $params
@@ -84,6 +92,9 @@ final class EmailsMetricsService
 
     /**
      * Get clicks by link
+     *
+     * Clicks in a date range by the link that was clicked, with people and machines counted apart.
+     * Needs a full access key.
      *
      * GET /emails/metrics/links (emails.metrics.links)
      *

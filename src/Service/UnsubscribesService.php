@@ -38,20 +38,6 @@ final class UnsubscribesService
     }
 
     /**
-     * Delete an unsubscribe
-     *
-     * DELETE /unsubscribes/{id} (unsubscribes.delete)
-     *
-     * @param string $id
-     * @param RequestOptions $options
-     * @return array<string, mixed>
-     */
-    public function delete(string $id, array $options = []): array
-    {
-        return $this->core->request(new Operation('unsubscribes.delete', 'DELETE', '/unsubscribes/{id}', ['id' => $id], false, false, []), [], null, $options);
-    }
-
-    /**
      * List unsubscribes
      *
      * Newest first, with cursor pagination: `after` takes the last id of a page and pages toward

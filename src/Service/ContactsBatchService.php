@@ -24,7 +24,7 @@ final class ContactsBatchService
     }
 
     /**
-     * Create in bulk
+     * Create contacts in bulk
      *
      * Creates up to 1000 contacts in one request. Each item is a CreateContactRequest.
      * `on_conflict` decides what happens to an email that already belongs to a contact — `error`
@@ -77,7 +77,7 @@ final class ContactsBatchService
     }
 
     /**
-     * Delete in bulk
+     * Delete contacts in bulk
      *
      * Deletes up to 1000 contacts by id or by email address in one request and lists the rows
      * actually deleted; unknown ids or addresses are skipped. Emails stay in the log; `erase: true`

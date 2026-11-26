@@ -43,15 +43,19 @@ final class Client
      *     transport?: Transport,
      * } $options base_url defaults to BILLIONSEND_BASE_URL, then
      *   https://api.billionsend.com; timeout (seconds) bounds each attempt
-     *   (default 60); max_retries is the retries for 429, 5xx, timeouts and
-     *   network failures (default 2), only of requests safe to repeat: GET,
-     *   PUT and DELETE, and the sending operations, which always carry an
-     *   Idempotency-Key; headers go with every request; transport replaces
-     *   the cURL one.
+     *   (default 60); max_retries is the retries of one call (default 2): a
+     *   429 for any request, and 5xx, timeouts and network failures of
+     *   requests safe to repeat (GET, PUT and DELETE other than uploads, and
+     *   any request with an Idempotency-Key); headers go with every request;
+     *   transport replaces the cURL one.
      */
     public function __construct(?string $apiKey = null, array $options = [])
     {
-        $apiKey ??= self::env('BILLIONSEND_API_KEY');
+        // A key read from a file or the environment often ends in a newline.
+        $apiKey = trim($apiKey ?? self::env('BILLIONSEND_API_KEY') ?? '');
+        if (preg_match('/[\x00-\x1F\x7F]/', $apiKey)) {
+            throw new \InvalidArgumentException('The API key must not contain control characters');
+        }
         $baseUrl = rtrim($options['base_url'] ?? self::env('BILLIONSEND_BASE_URL') ?? self::DEFAULT_BASE_URL, '/');
         $timeout = (float) ($options['timeout'] ?? self::DEFAULT_TIMEOUT);
         $maxRetries = (int) ($options['max_retries'] ?? self::DEFAULT_MAX_RETRIES);

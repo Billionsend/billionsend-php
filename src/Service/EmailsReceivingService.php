@@ -31,8 +31,8 @@ final class EmailsReceivingService
      *
      * BillionSend extension: erases one received email now, its sealed content, inbox memberships
      * and received secrets with it, and threads it leaves empty. Needs a full access key that is
-     * not scoped to an inbox; for an MCP token, the owner or admin role. Webhook payloads already
-     * sent keep their metadata until the payload retention strips them.
+     * not scoped to an inbox, from an owner, admin or developer. Webhook payloads already sent keep
+     * their metadata until the payload retention strips them.
      *
      * DELETE /emails/receiving/{id} (emails.receiving.delete)
      *
@@ -100,9 +100,11 @@ final class EmailsReceivingService
      * addressed to its domain only, an inbox-scoped key mail delivered into its inbox. Mail held
      * for screening or in quarantine is left out unless a full access key asks for it
      * (include_quarantined, quarantined). With wait, the request is held until matching mail
-     * arrives (long-poll). An inbox_id the key can't reach answers 404 at once, without waiting; an
-     * inbox-scoped key naming another inbox gets 403 restricted_api_key. Everything in a received
-     * email was written by whoever sent it, so its HTML is safe to show only in a sandbox.
+     * arrives (long-poll). The inbox_id filter takes an inbox ID or its email address, as the
+     * /inboxes/{inbox_id} paths do. An inbox the key can't reach answers 404 at once, without
+     * waiting; an inbox-scoped key naming another inbox gets 403 restricted_api_key. Everything in
+     * a received email was written by whoever sent it, so its HTML is safe to show only in a
+     * sandbox.
      *
      * GET /emails/receiving (emails.receiving.list)
      *
@@ -114,9 +116,11 @@ final class EmailsReceivingService
      * rule as after.
      * - wait: BillionSend extension: hold the request up to this many seconds (0-50) until matching
      * mail newer than the cursor arrives; an empty list with 200 when none did
-     * - since: BillionSend extension: only mail received after this instant; with wait and no
-     * cursor it defaults to one minute before the request
-     * - inbox_id: BillionSend extension: only mail delivered into this inbox
+     * - since: BillionSend extension: only mail received after this instant; with wait it means
+     * mail that became visible after it (delivered, or released from screening), and with no cursor
+     * it defaults to one minute before the request
+     * - inbox_id: BillionSend extension: only mail delivered into this inbox, by inbox ID or email
+     * address (as in the /inboxes/{inbox_id} paths)
      * - to: BillionSend extension: only mail with this address in received_for
      * - from: BillionSend extension: a sender address, or a domain matching itself and its
      * subdomains

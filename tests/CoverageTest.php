@@ -93,7 +93,7 @@ final class CoverageTest extends TestCase
         $covered = array_keys($calls);
         sort($covered);
         $this->assertSame($snapshot, $covered, 'one call per operation of the snapshot');
-        $this->assertCount(139, $snapshot);
+        $this->assertCount(186, $snapshot);
         foreach ($calls as $id => $call) {
             $before = count($hits[$id] ?? []);
             $call($client);

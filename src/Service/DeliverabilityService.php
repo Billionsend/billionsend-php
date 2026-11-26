@@ -26,6 +26,9 @@ final class DeliverabilityService
     /**
      * Get deliverability
      *
+     * The account deliverability score over the last 30 days, its content and outcome parts, your
+     * hard bounce and complaint rates, and your standing. BillionSend extension.
+     *
      * GET /deliverability (deliverability.get)
      *
      * @param RequestOptions $options

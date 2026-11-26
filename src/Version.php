@@ -7,5 +7,5 @@ namespace BillionSend;
 final class Version
 {
     /** This SDK's version, sent in the User-Agent header. */
-    public const VERSION = '0.1.2';
+    public const VERSION = '0.2.0';
 }

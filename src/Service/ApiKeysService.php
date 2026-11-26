@@ -90,4 +90,23 @@ final class ApiKeysService
     {
         return Pagination::walk(fn (array $page): array => $this->list($page, $options), $params);
     }
+
+    /**
+     * Update an API key
+     *
+     * Renames the key. Its permission, domain and inbox scope never change: mint a new key for
+     * another scope. A key held to one domain updates only keys held to that same domain; any other
+     * key is not found.
+     *
+     * PATCH /api-keys/{id} (apiKeys.update)
+     *
+     * @param string $id
+     * @param array<string, mixed> $body The request body.
+     * @param RequestOptions $options
+     * @return array<string, mixed>
+     */
+    public function update(string $id, array $body, array $options = []): array
+    {
+        return $this->core->request(new Operation('apiKeys.update', 'PATCH', '/api-keys/{id}', ['id' => $id], false, false, []), [], $body, $options);
+    }
 }

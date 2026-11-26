@@ -20,12 +20,14 @@ use BillionSend\Pagination;
 final class ContactsService
 {
     public readonly ContactsBatchService $batch;
+    public readonly ContactsImportsService $imports;
     public readonly ContactsSegmentsService $segments;
     public readonly ContactsTopicsService $topics;
 
     public function __construct(private readonly Core $core)
     {
         $this->batch = new ContactsBatchService($core);
+        $this->imports = new ContactsImportsService($core);
         $this->segments = new ContactsSegmentsService($core);
         $this->topics = new ContactsTopicsService($core);
     }

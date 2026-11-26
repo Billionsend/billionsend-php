@@ -15,6 +15,7 @@ final class Operation
      * @param array<string, string> $pathParams path parameter name => value
      * @param list<string> $headerParams the names of the parameters sent as headers
      * @param bool $listBody the body is a JSON array (an empty PHP array is sent as [], not {})
+     * @param list<string>|null $fileFields set when the body is multipart/form-data: the fields that are files
      */
     public function __construct(
         public readonly string $id,
@@ -25,6 +26,7 @@ final class Operation
         public readonly bool $noAuth = false,
         public readonly array $headerParams = [],
         public readonly bool $listBody = false,
+        public readonly ?array $fileFields = null,
     ) {
     }
 }

@@ -19,17 +19,23 @@ use BillionSend\Pagination;
  */
 final class EmailsService
 {
+    public readonly EmailsAttachmentsService $attachments;
     public readonly EmailsMetricsService $metrics;
     public readonly EmailsReceivingService $receiving;
 
     public function __construct(private readonly Core $core)
     {
+        $this->attachments = new EmailsAttachmentsService($core);
         $this->metrics = new EmailsMetricsService($core);
         $this->receiving = new EmailsReceivingService($core);
     }
 
     /**
      * Send a batch of emails
+     *
+     * Queue up to 100 emails in one request. With `x-batch-validation: strict` (the default) one
+     * invalid email refuses the whole batch; with `permissive` the valid ones are queued and each
+     * invalid one is reported by its index.
      *
      * POST /emails/batch (emails.batch)
      *
@@ -94,6 +100,9 @@ final class EmailsService
     /**
      * Get email insights
      *
+     * The check results and score for one email. Answers 404 when the email has no insights.
+     * BillionSend extension.
+     *
      * GET /emails/{id}/insights (emails.insights)
      *
      * @param string $id
@@ -144,6 +153,10 @@ final class EmailsService
     /**
      * Send an email
      *
+     * Queue one email for sending, now or at `scheduled_at` (up to 30 days ahead). `to`, `cc` and
+     * `bcc` together hold at most 50 recipients. Retry with the same `Idempotency-Key` and payload
+     * to get the original answer instead of a second email.
+     *
      * POST /emails (emails.send)
      *
      * It always sends an Idempotency-Key: $options['idempotency_key'], or a new UUID
@@ -156,6 +169,43 @@ final class EmailsService
     public function send(array $body, array $options = []): array
     {
         return $this->core->request(new Operation('emails.send', 'POST', '/emails', [], true, false, []), [], $body, $options);
+    }
+
+    /**
+     * Share an email
+     *
+     * Creates a public link to view one sent email: its header lines and its body, nothing else
+     * about the team or the email (no Bcc, no files to download). The link carries a random token,
+     * expires after `expires_in` (48 hours at most, and by default) and can be revoked earlier with
+     * `DELETE /emails/{id}/share`. Needs a full access key.
+     *
+     * POST /emails/{id}/share (emails.share)
+     *
+     * @param string $id
+     * @param array<string, mixed>|null $body The request body.
+     * @param RequestOptions $options
+     * @return array<string, mixed>
+     */
+    public function share(string $id, ?array $body = null, array $options = []): array
+    {
+        return $this->core->request(new Operation('emails.share', 'POST', '/emails/{id}/share', ['id' => $id], false, false, []), [], $body, $options);
+    }
+
+    /**
+     * Revoke an email's share links
+     *
+     * Ends every live share link of one sent email at once. BillionSend extension; the links of
+     * other emails are not touched. Needs a full access key.
+     *
+     * DELETE /emails/{id}/share (emails.unshare)
+     *
+     * @param string $id
+     * @param RequestOptions $options
+     * @return array<string, mixed>
+     */
+    public function unshare(string $id, array $options = []): array
+    {
+        return $this->core->request(new Operation('emails.unshare', 'DELETE', '/emails/{id}/share', ['id' => $id], false, false, []), [], null, $options);
     }
 
     /**

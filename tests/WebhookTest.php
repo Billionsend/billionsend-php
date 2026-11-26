@@ -57,6 +57,16 @@ final class WebhookTest extends TestCase
         $this->refused(fn () => Webhook::verify(self::PAYLOAD . ' ', self::headers(), self::SECRET, now: self::AT), 'No webhook signature matches');
     }
 
+    public function testAcceptsWhitespaceAroundTheSecretAndTheHeaders(): void
+    {
+        $headers = [
+            'webhook-id' => ' ' . self::ID,
+            'webhook-timestamp' => self::TIMESTAMP . "\n",
+            'webhook-signature' => " v1,AAAA\t\n " . self::SIGNATURE . ' ',
+        ];
+        $this->assertSame(['test' => 2432232314], Webhook::verify(self::PAYLOAD, $headers, ' ' . self::SECRET . "\n", now: self::AT));
+    }
+
     public function testRefusesOldNewAndMalformedTimestamps(): void
     {
         $this->refused(fn () => Webhook::verify(self::PAYLOAD, self::headers(), self::SECRET, now: self::AT + 301), 'too old');

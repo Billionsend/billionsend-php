@@ -176,8 +176,13 @@ final class EventStream implements \IteratorAggregate
         $data = [];
         $event = '';
         $id = $this->lastEventId;
+        $identified = false;
         $first = true;
         while (!$this->closed && is_resource($handle) && ($line = fgets($handle)) !== false) {
+            // A line cut off by a drop or the idle timeout is not part of a block.
+            if (!str_ends_with($line, "\n")) {
+                break;
+            }
             $line = rtrim($line, "\r\n");
             if ($first) {
                 $first = false;
@@ -188,7 +193,12 @@ final class EventStream implements \IteratorAggregate
             if ($line === '') {
                 if ($data !== []) {
                     yield ['id' => $id, 'event' => $event === '' ? 'message' : $event, 'data' => implode("\n", $data)];
+                } elseif ($identified) {
+                    // An id sent without data still moves the position: the
+                    // server opens a stream with one, to resume from.
+                    $this->lastEventId = $id;
                 }
+                $identified = false;
                 $data = [];
                 $event = '';
                 continue;
@@ -212,6 +222,7 @@ final class EventStream implements \IteratorAggregate
                 case 'id':
                     if (!str_contains($value, "\0")) {
                         $id = $value;
+                        $identified = true;
                     }
                     break;
                 case 'retry':
