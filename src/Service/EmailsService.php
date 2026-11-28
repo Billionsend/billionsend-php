@@ -72,6 +72,12 @@ final class EmailsService
     /**
      * Delete an email
      *
+     * Deletes the email with its events, stored content and share links; an email that has not gone
+     * out also gives its volume back. An email that went out less than 7 days ago answers `409
+     * email_recently_sent`, because bounce and complaint reports still arrive for it; the days
+     * count from the moment it was handed over for sending, whatever came of it, and the message
+     * names the earliest time it can be deleted. BillionSend extension.
+     *
      * DELETE /emails/{id} (emails.delete)
      *
      * @param string $id

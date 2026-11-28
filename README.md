@@ -2,7 +2,7 @@
 
 The official PHP client for the [BillionSend](https://billionsend.com) email API: send email, run inboxes for people and agents, stream inbox events, verify webhooks, and manage domains, contacts and broadcasts.
 
-- Every API operation (186), generated from the BillionSend OpenAPI document.
+- Every API operation (193), generated from the BillionSend OpenAPI document.
 - Errors as classes, all `BillionSendError`s with the status, the API's error name and the request id.
 - Safe sends: every send carries an `Idempotency-Key`, so retries after a timeout never send twice.
 - Generators for every list, and live inbox events with automatic resume.

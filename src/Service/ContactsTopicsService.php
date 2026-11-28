@@ -26,15 +26,39 @@ final class ContactsTopicsService
     /**
      * List contact topics
      *
+     * Newest first, with cursor pagination: `after` takes the last id of a page and pages toward
+     * older items, `before` takes the first id and pages back toward newer ones.
+     *
      * GET /contacts/{id}/topics (contacts.topics.list)
      *
      * @param string $id
+     * @param array{limit?: int, after?: string, before?: string} $params
+     * - limit: Page size, 1-100 (default 20)
+     * - after: Cursor: id of the last item of the current page; returns the next page. Must be an
+     * id this list returned; there is no sentinel value.
+     * - before: Cursor: id of the first item of the current page; returns the previous page; same
+     * rule as after.
      * @param RequestOptions $options
      * @return array<string, mixed>
      */
-    public function list(string $id, array $options = []): array
+    public function list(string $id, array $params = [], array $options = []): array
     {
-        return $this->core->request(new Operation('contacts.topics.list', 'GET', '/contacts/{id}/topics', ['id' => $id], false, false, []), [], null, $options);
+        return $this->core->request(new Operation('contacts.topics.list', 'GET', '/contacts/{id}/topics', ['id' => $id], false, false, []), $params, null, $options);
+    }
+
+    /**
+     * Walks every item of list(), fetching pages as it goes: forward from
+     * $params['after'], or backward when $params['before'] is set. A failed page
+     * throws its BillionSendError.
+     *
+     * @param string $id
+     * @param array<string, mixed> $params
+     * @param RequestOptions $options
+     * @return \Generator<int, array<string, mixed>>
+     */
+    public function listAll(string $id, array $params = [], array $options = []): \Generator
+    {
+        return Pagination::walk(fn (array $page): array => $this->list($id, $page, $options), $params);
     }
 
     /**

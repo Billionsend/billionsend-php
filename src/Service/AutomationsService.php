@@ -178,18 +178,20 @@ final class AutomationsService
     /**
      * Stop an automation
      *
-     * Sets the automation to disabled: no new runs start; runs already going finish. Stopping a
-     * stopped automation answers the same.
+     * Sets the automation to disabled: no new runs start; runs already going finish, unless
+     * cancel_runs cancels them. Stopping a stopped automation answers the same, and with
+     * cancel_runs cancels what is still going, so a call cut short can be repeated.
      *
      * POST /automations/{id}/stop (automations.stop)
      *
      * @param string $id Automation id
+     * @param array<string, mixed>|null $body The request body.
      * @param RequestOptions $options
      * @return array<string, mixed>
      */
-    public function stop(string $id, array $options = []): array
+    public function stop(string $id, ?array $body = null, array $options = []): array
     {
-        return $this->core->request(new Operation('automations.stop', 'POST', '/automations/{id}/stop', ['id' => $id], false, false, []), [], null, $options);
+        return $this->core->request(new Operation('automations.stop', 'POST', '/automations/{id}/stop', ['id' => $id], false, false, []), [], $body, $options);
     }
 
     /**

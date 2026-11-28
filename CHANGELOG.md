@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 (2026-11-28)
+
+The OpenAPI snapshot follows the published document again, 193 operations, all with a method.
+
+- New operations: broadcast groups, one send from several sending domains (`broadcastGroups->create`, `list`, `get`, `update`, `remove`, `send` and `cancel`, with `broadcastGroups->listAll()`).
+- `topics->list()` and `contacts->topics->list()` are cursor-paginated (`limit`, `after`, `before`) and have their `...All()` generators. They take `$params` before the call's options, like every other list.
+- `automations->stop()` takes an optional body: `['cancel_runs' => true]` also cancels the runs still going. It sits before the call's options.
+- Broadcasts take `audience_id` on create and update, and answer `audience_id` and `group_id`; domains take `tls` on create and update; an email answers `topic_id` and `tags`.
+- `emails->delete()` documents the 7-day rule: an email that went out less than 7 days ago answers `409 email_recently_sent`.
+
 ## 0.2.0 (2026-11-26)
 
 The OpenAPI snapshot is now the published document (https://billionsend.com/docs/api.openapi.json), 186 operations, all with a method.

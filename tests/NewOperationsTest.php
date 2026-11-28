@@ -30,11 +30,20 @@ final class NewOperationsTest extends TestCase
         yield 'automations.runs.list' => [fn (Client $c) => $c->automations->runs->list('a1', $q), 'GET', '/automations/a1/runs?limit=2&after=x'];
         yield 'automations.simulate' => [fn (Client $c) => $c->automations->simulate('a1', ['contact_id' => 'c1']), 'POST', '/automations/a1/simulate', '{"contact_id":"c1"}'];
         yield 'automations.stop' => [fn (Client $c) => $c->automations->stop('a1'), 'POST', '/automations/a1/stop'];
+        yield 'automations.stop cancelling its runs' => [fn (Client $c) => $c->automations->stop('a1', ['cancel_runs' => true]), 'POST', '/automations/a1/stop', '{"cancel_runs":true}'];
         yield 'automations.update' => [fn (Client $c) => $c->automations->update('a1', ['status' => 'enabled']), 'PATCH', '/automations/a1', '{"status":"enabled"}'];
         yield 'automations.validate' => [fn (Client $c) => $c->automations->validate(['steps' => [], 'connections' => []]), 'POST', '/automations/validate', '{"steps":[],"connections":[]}'];
         yield 'brand.get' => [fn (Client $c) => $c->brand->get(), 'GET', '/brand'];
         yield 'brand.logo.delete' => [fn (Client $c) => $c->brand->logo->delete(), 'DELETE', '/brand/logo'];
         yield 'brand.update' => [fn (Client $c) => $c->brand->update(['accent_color' => null]), 'PATCH', '/brand', '{"accent_color":null}'];
+        yield 'broadcastGroups.cancel' => [fn (Client $c) => $c->broadcastGroups->cancel('g1'), 'POST', '/broadcast-groups/g1/cancel'];
+        yield 'broadcastGroups.create' => [fn (Client $c) => $c->broadcastGroups->create(['name' => 'Launch']), 'POST', '/broadcast-groups', '{"name":"Launch"}'];
+        yield 'broadcastGroups.get' => [fn (Client $c) => $c->broadcastGroups->get('g1'), 'GET', '/broadcast-groups/g1'];
+        yield 'broadcastGroups.list' => [fn (Client $c) => $c->broadcastGroups->list($q), 'GET', '/broadcast-groups?limit=2&after=x'];
+        yield 'broadcastGroups.remove' => [fn (Client $c) => $c->broadcastGroups->remove('g1'), 'DELETE', '/broadcast-groups/g1'];
+        yield 'broadcastGroups.send' => [fn (Client $c) => $c->broadcastGroups->send('g1', ['scheduled_at' => 'in 1 hour']), 'POST', '/broadcast-groups/g1/send', '{"scheduled_at":"in 1 hour"}'];
+        yield 'broadcastGroups.send without a body' => [fn (Client $c) => $c->broadcastGroups->send('g1'), 'POST', '/broadcast-groups/g1/send'];
+        yield 'broadcastGroups.update' => [fn (Client $c) => $c->broadcastGroups->update('g1', ['name' => 'Launch 2']), 'PATCH', '/broadcast-groups/g1', '{"name":"Launch 2"}'];
         yield 'broadcasts.clickedLinks' => [fn (Client $c) => $c->broadcasts->clickedLinks('b1', $q), 'GET', '/broadcasts/b1/clicked-links?limit=2&after=x'];
         yield 'broadcasts.recipients' => [fn (Client $c) => $c->broadcasts->recipients('b1', ['type' => 'bounced', 'bounce_type' => 'Permanent']), 'GET', '/broadcasts/b1/recipients?type=bounced&bounce_type=Permanent'];
         yield 'contacts.imports.get' => [fn (Client $c) => $c->contacts->imports->get('i1'), 'GET', '/contacts/imports/i1'];
@@ -60,6 +69,8 @@ final class NewOperationsTest extends TestCase
         yield 'logs.list' => [fn (Client $c) => $c->logs->list($q), 'GET', '/logs?limit=2&after=x'];
         yield 'oauthGrants.list' => [fn (Client $c) => $c->oauthGrants->list($q), 'GET', '/oauth/grants?limit=2&after=x'];
         yield 'oauthGrants.revoke' => [fn (Client $c) => $c->oauthGrants->revoke('g1'), 'DELETE', '/oauth/grants/g1'];
+        yield 'contacts.topics.list' => [fn (Client $c) => $c->contacts->topics->list('ana@example.com', $q), 'GET', '/contacts/ana%40example.com/topics?limit=2&after=x'];
+        yield 'topics.list' => [fn (Client $c) => $c->topics->list($q), 'GET', '/topics?limit=2&after=x'];
         yield 'suppressions.list by kind' => [fn (Client $c) => $c->suppressions->list(['kind' => 'domain']), 'GET', '/suppressions?kind=domain'];
         yield 'webhooks.events.attempts.list' => [fn (Client $c) => $c->webhooks->events->attempts->list('w1', 'v1', $q), 'GET', '/webhooks/w1/events/v1/attempts?limit=2&after=x'];
         yield 'webhooks.events.get' => [fn (Client $c) => $c->webhooks->events->get('w1', 'v1'), 'GET', '/webhooks/w1/events/v1'];
@@ -89,6 +100,9 @@ final class NewOperationsTest extends TestCase
     {
         yield 'automations' => [fn (Client $c) => $c->automations->listAll(), '/automations'];
         yield 'automation runs' => [fn (Client $c) => $c->automations->runs->listAll('a1'), '/automations/a1/runs'];
+        yield 'broadcast groups' => [fn (Client $c) => $c->broadcastGroups->listAll(), '/broadcast-groups'];
+        yield 'contact topics' => [fn (Client $c) => $c->contacts->topics->listAll('c1'), '/contacts/c1/topics'];
+        yield 'topics' => [fn (Client $c) => $c->topics->listAll(), '/topics'];
         yield 'clicked links' => [fn (Client $c) => $c->broadcasts->clickedLinksAll('b1'), '/broadcasts/b1/clicked-links'];
         yield 'recipients' => [fn (Client $c) => $c->broadcasts->recipientsAll('b1'), '/broadcasts/b1/recipients'];
         yield 'contact imports' => [fn (Client $c) => $c->contacts->imports->listAll(), '/contacts/imports'];

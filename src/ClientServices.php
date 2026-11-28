@@ -11,6 +11,7 @@ use BillionSend\Service\ApiKeysService;
 use BillionSend\Service\AudiencesService;
 use BillionSend\Service\AutomationsService;
 use BillionSend\Service\BrandService;
+use BillionSend\Service\BroadcastGroupsService;
 use BillionSend\Service\BroadcastsService;
 use BillionSend\Service\ContactPropertiesService;
 use BillionSend\Service\ContactsService;
@@ -40,6 +41,7 @@ trait ClientServices
     public readonly AudiencesService $audiences;
     public readonly AutomationsService $automations;
     public readonly BrandService $brand;
+    public readonly BroadcastGroupsService $broadcastGroups;
     public readonly BroadcastsService $broadcasts;
     public readonly ContactPropertiesService $contactProperties;
     public readonly ContactsService $contacts;
@@ -66,6 +68,7 @@ trait ClientServices
         $this->audiences = new AudiencesService($core);
         $this->automations = new AutomationsService($core);
         $this->brand = new BrandService($core);
+        $this->broadcastGroups = new BroadcastGroupsService($core);
         $this->broadcasts = new BroadcastsService($core);
         $this->contactProperties = new ContactPropertiesService($core);
         $this->contacts = new ContactsService($core);
